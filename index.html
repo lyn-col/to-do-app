@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To-Do App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 400px;
+            background: white;
+            margin: 50px auto;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        input {
+            width: 90%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            background: #28a745;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover {
+            background: #218838;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            background: #eee;
+            padding: 10px;
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .completed {
+            text-decoration: line-through;
+            color: gray;
+        }
+        .delete-btn {
+            background: #dc3545;
+            padding: 5px;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+        }
+        .delete-btn:hover {
+            background: #c82333;
+        }
+        .edit-btn {
+            background: #ffc107;
+            padding: 5px;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        .edit-btn:hover {
+            background: #e0a800;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="authContainer">
+        <h1 id="authTitle">Login</h1>
+        <input type="text" id="username" placeholder="Username" style="display: none;">
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Password">
+        <button id="authBtn">Login</button>
+        <p id="toggleAuth">Don't have an account? <a href="#">Register</a></p>
+    </div>
+
+    <div class="container" id="todoContainer" style="display: none;">
+        <h1>To-Do List</h1>
+        <button id="logoutBtn">Logout</button>
+        <div>
+            <input type="text" id="taskTitle" placeholder="Enter task title">
+            <input type="text" id="taskDescription" placeholder="Enter task description (optional)">
+            <button id="addTaskBtn">Add Task</button>
+        </div>
+        <ul id="taskList"></ul>
+    </div>
+
+    <script>
+        const apiUrl = "http://localhost:8081";
+
+        function deleteTask(taskId) {
+            fetch(`${apiUrl}/tasks/${taskId}`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" }
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Remove the deleted task from the DOM
+                    const taskElement = document.getElementById(`task-${taskId}`);
+                    if (taskElement) {
+                        taskElement.remove();
+                    }
+                } else {
+                    console.error("Failed to delete task");
+                }
+            })
+            .catch(err => console.error("Error deleting task:", err));
+        }
+
+        function editTask(taskId, oldTitle, oldDescription) {
+            const newTitle = prompt("Edit task title:", oldTitle);
+            const newDescription = prompt("Edit task description:", oldDescription);
+            if (newTitle === null || newTitle.trim() === "") return;
+
+            fetch(`${apiUrl}/tasks/${taskId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ title: newTitle, description: newDescription })
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Update the task in the DOM
+                    const taskElement = document.getElementById(`task-${taskId}`);
+                    if (taskElement) {
+                        taskElement.innerHTML = `
+                            ${newTitle} - ${newDescription || "No description"} ${taskElement.innerHTML.includes("✅") ? "✅" : "❌"}
+                            <span class="edit-btn" onclick="editTask(${taskId}, '${newTitle}', '${newDescription}')">✏️</span>
+                            <span class="delete-btn" onclick="deleteTask(${taskId})">❌</span>
+                        `;
+                    }
+                } else {
+                    console.error("Failed to update task");
+                }
+            })
+            .catch(err => console.error("Error updating task:", err));
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            const authContainer = document.getElementById("authContainer");
+            const todoContainer = document.getElementById("todoContainer");
+            const authTitle = document.getElementById("authTitle");
+            const toggleAuth = document.getElementById("toggleAuth");
+            const authBtn = document.getElementById("authBtn");
+            const usernameInput = document.getElementById("username");
+            const emailInput = document.getElementById("email");
+            const passwordInput = document.getElementById("password");
+            const taskTitleInput = document.getElementById("taskTitle");
+            const taskDescriptionInput = document.getElementById("taskDescription");
+            const taskList = document.getElementById("taskList");
+            const addTaskBtn = document.getElementById("addTaskBtn");
+            const logoutBtn = document.getElementById("logoutBtn");
+
+            let isLogin = true;
+
+            toggleAuth.addEventListener("click", function() {
+                isLogin = !isLogin;
+                authTitle.innerText = isLogin ? "Login" : "Register";
+                authBtn.innerText = isLogin ? "Login" : "Register";
+                usernameInput.style.display = isLogin ? "none" : "block";
+                toggleAuth.innerHTML = isLogin ? "Don't have an account? <a href='#'>Register</a>" : "Already have an account? <a href='#'>Login</a>";
+            });
+
+            authBtn.addEventListener("click", function() {
+                const endpoint = isLogin ? "/auth/login" : "/auth/register";
+                let requestBody = {
+                    email: emailInput.value,
+                    password: passwordInput.value
+                };
+                if (!isLogin) {
+                    requestBody.username = usernameInput.value;
+                }
+
+                fetch(apiUrl + endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(requestBody)
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (isLogin && data.user.id) {
+                        localStorage.setItem("user_id", data.user.id);
+                        showTodoPage();
+                    } else if (!isLogin) {
+                        alert("Registration successful! Please login.");
+                        toggleAuth.click();
+                    } else {
+                        alert("Invalid login credentials");
+                    }
+                })
+                .catch(err => console.error("Error:", err));
+            });
+
+            function showTodoPage() {
+                authContainer.style.display = "none";
+                todoContainer.style.display = "block";
+                fetchTasks();
+            }
+
+            function fetchTasks() {
+                const user_id = localStorage.getItem("user_id");
+                if (!user_id) return;
+
+                fetch(`${apiUrl}/tasks?user_id=${user_id}`, {
+                    method: "GET",
+                    headers: { "Content-Type": "application/json" }
+                })
+                .then(res => res.json())
+                .then(tasks => {
+                    taskList.innerHTML = "";
+                    tasks.forEach(task => {
+                        const li = document.createElement("li");
+                        li.id = `task-${task.id}`; // Add unique ID for DOM removal
+                        li.innerHTML = `
+                            ${task.title} - ${task.description || "No description"} ${task.completed ? "✅" : "❌"}
+                            <span class="edit-btn" onclick="editTask(${task.id}, '${task.title}', '${task.description}')">✏️</span>
+                            <span class="delete-btn" onclick="deleteTask(${task.id})">❌</span>
+                        `;
+                        taskList.appendChild(li);
+                    });
+                })
+                .catch(err => console.error("Error fetching tasks:", err));
+            }
+
+            addTaskBtn.addEventListener("click", function() {
+                const taskTitle = taskTitleInput.value.trim();
+                const taskDescription = taskDescriptionInput.value.trim();
+                if (taskTitle === "") return;
+
+                const user_id = localStorage.getItem("user_id");
+                if (!user_id) {
+                    alert("User not logged in!");
+                    return;
+                }
+
+                fetch(`${apiUrl}/tasks`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ user_id: parseInt(user_id), title: taskTitle, description: taskDescription, completed: false })
+                })
+                .then(() => {
+                    fetchTasks();
+                    taskTitleInput.value = "";
+                    taskDescriptionInput.value = "";
+                })
+                .catch(err => console.error("Error adding task:", err));
+            });
+
+            logoutBtn.addEventListener("click", function() {
+                localStorage.removeItem("user_id");
+                authContainer.style.display = "block";
+                todoContainer.style.display = "none";
+            });
+        });
+    </script>
+</body>
+</html>
